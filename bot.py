@@ -1,8 +1,8 @@
 """
 Bot de Telegram para registrar gastos, ingresos y transferencias en Notion.
-Cris y Mari le escriben en lenguaje natural, Claude interpreta el mensaje
+Cris y Mari le escriben en lenguaje natural, Groq (Llama) interpreta el mensaje
 (incluyendo qué tipo de movimiento es), y el bot crea la fila correspondiente
-en la base de Notion que aplique.
+en la base de Notion que aplique — dentro del workspace "Hogar - Cris & Mari".
 """
 
 import json
@@ -37,28 +37,48 @@ BOGOTA_TZ = timezone(timedelta(hours=-5))
 
 # Cuentas reales (usadas por los tres tipos de movimiento).
 CUENTAS = {
-    "Mari Bancolombia": "2e96cb1b-5b1d-8054-a4bf-ddfa1b74f32c",
-    "Mari Nu": "2e96cb1b-5b1d-8099-bab4-ce52b3649611",
-    "Cris Bancolombia": "2e96cb1b-5b1d-805c-912e-db9d80a83302",
-    "Rappi Cris": "2e96cb1b-5b1d-8012-a1e4-cdc05f03d2c0",
-    "Rappi Mari": "3426cb1b-5b1d-800f-bcb3-daf71679ff5d",
+    "Nequi Cris": "3366cb1b-5b1d-80db-977c-d8abfe5b8422",
+    "Nu Mari": "3366cb1b-5b1d-806a-aad8-c55a93da30f5",
+    "RappiCuenta Cris": "3366cb1b-5b1d-80b5-8bb4-ecb9df3762ce",
+    "RappiCard Cris": "3366cb1b-5b1d-80bc-8977-cc7942e9a44b",
+    "Cash": "3366cb1b-5b1d-80d1-9b4c-ff40ed8b4cd5",
+    "GZero": "3366cb1b-5b1d-8017-b72d-fa41548e30cc",
+    "RappiCard Mari": "3366cb1b-5b1d-804e-8ae7-f3cbd67fd898",
 }
 
-# Categorías (solo para gastos).
-CATEGORIAS = {
-    "Diezmo": "3b16cb1b-5b1d-80e3-8740-eeb8c1cc12dd",
-    "Seguridad Social": "2e96cb1b-5b1d-8051-a716-e77abd786b47",
-    "Suscripciones": "2e96cb1b-5b1d-8058-9f52-c7b5e3a975b9",
-    "Salarios": "2e96cb1b-5b1d-80f5-9976-e0c2b8b8b962",
-    "Impuestos": "2e96cb1b-5b1d-8075-8d57-c218e9afd374",
-    "Gastos": "2fe6cb1b-5b1d-80f3-bb3b-e54c306bbd26",
-    "Crédito Bombotá": "2fe6cb1b-5b1d-8069-bd7b-cfec500fca21",
+# Categorías válidas para gastos.
+CATEGORIAS_GASTOS = {
+    "Mesada Cris": "37b6cb1b-5b1d-80d9-b437-dcbad1d49071",
+    "Salud": "37b6cb1b-5b1d-8004-a2eb-f48868ed50ef",
+    "Mesada Mari": "3b16cb1b-5b1d-80f3-b05b-c54104e4dccf",
+    "Entretenimiento": "2d56cb1b-5b1d-8156-b032-dbedd0429c54",
+    "Trabajo": "2d56cb1b-5b1d-8144-bf97-fbb361459dc8",
+    "Compras de Casa": "2d56cb1b-5b1d-8131-b599-f209de1a7a8a",
+    "Comer por Fuera": "2d56cb1b-5b1d-81e6-9361-da42d8a71de6",
+    "Belleza": "35a6cb1b-5b1d-802a-a86e-cac4dcf431ee",
+    "Arriendo / Admin de la casa": "2d56cb1b-5b1d-81f9-9476-ec82972f0213",
+    "Viajes y Vacaciones": "2d56cb1b-5b1d-8124-a721-fe6b0c99ee0a",
+    "Inversiones": "2d56cb1b-5b1d-81f9-a1e5-eeed7a2c10a0",
+    "Transporte": "2d56cb1b-5b1d-8175-aaf5-dc47831ba5df",
+    "Facturas y Utilidades": "2d56cb1b-5b1d-81bc-8185-cd23e263a0e2",
+    "Educación": "2d56cb1b-5b1d-818a-a718-f180ee17ce78",
+    "Comida y Mercado": "2d56cb1b-5b1d-81bd-8ea9-e3335298c8b8",
 }
 
-# Fuentes válidas (solo para ingresos). Ninguna es obligatoria: si no aplica, se deja null.
-FUENTES = ["Branding", "Artista Mensual", "Música", "Redes Sociales", "Asesorías", "Ayudas"]
+# Categorías válidas para ingresos (llamadas "Fuente" en el prompt para no confundir con las de gastos).
+CATEGORIAS_INGRESOS = {
+    "Ventas": "2d56cb1b-5b1d-8153-9099-f0d59a50a199",
+    "Freelance": "2d56cb1b-5b1d-81ae-9bf1-e5dc8a1e6324",
+    "Vacas": "35a6cb1b-5b1d-807e-b2ea-eb689a3d48c2",
+    "Ingreso de Negocio": "2d56cb1b-5b1d-8161-afaa-e6ad6981c3f7",
+    "Regalos / Donaciones": "2d56cb1b-5b1d-8172-bb45-caa4dc474704",
+    "Salario": "2d56cb1b-5b1d-81bb-a204-e4657d4b747e",
+    "Ingreso de Inversiones": "2d56cb1b-5b1d-81d4-92b6-db285c5cdea6",
+    "Ingreso de Rentas": "2d56cb1b-5b1d-8100-b59c-dd874ccba73d",
+    "Otros Trabajos": "2d56cb1b-5b1d-816e-adb5-d7c30db74d7a",
+}
 
-# Estado en memoria: si Claude necesita una aclaración, guardamos el mensaje original
+# Estado en memoria: si el modelo necesita una aclaración, guardamos el mensaje original
 # por chat_id hasta que la persona responda.
 pending_entries: dict[int, str] = {}
 
@@ -73,27 +93,33 @@ en datos estructurados para tres bases de datos de Notion: Gastos, Ingresos y Tr
 Primero decide el "tipo" de movimiento:
 - "gasto": compras, pagos, salidas de dinero.
 - "ingreso": dinero que entra (pago, venta, regalía, ayuda, etc.)
-- "transferencia": mover dinero de una cuenta propia a otra (ej. "pasé 100 mil de mi Bancolombia a mi Nu").
+- "transferencia": mover dinero de una cuenta propia a otra (ej. "pasé 100 mil de mi Nequi a mi Nu").
 
 Cuentas válidas (usa el nombre EXACTO): {", ".join(CUENTAS.keys())}
 
-Quien escribe el mensaje se llama: {sender_name}. Si el mensaje no aclara de quién es la
-cuenta (ej. "pagué con Bancolombia" sin decir de quién), asume que es la cuenta de {sender_name}.
-Si menciona Rappi sin aclarar de quién, usa "Rappi {sender_name}".
+Quien escribe el mensaje se llama: {sender_name}. Los nombres de cuenta ya incluyen "Cris" o "Mari"
+según de quién son (ej. "Nequi Cris", "Nu Mari"). Si el mensaje no aclara la cuenta pero sí el método
+de pago (ej. "pagué con Rappi" sin decir la tarjeta), asume la cuenta de tipo Rappi de {sender_name}
+("RappiCard {sender_name}" o "RappiCuenta {sender_name}", prioriza "RappiCard" si no hay más contexto).
+Si no hay ninguna pista de cuenta, usa "Cash" solo si el mensaje sugiere efectivo, si no pide aclaración.
 
 La fecha de hoy es {today}. Si el mensaje no menciona fecha, usa hoy. Si dice "ayer", "anteayer"
 o un día específico, calcula la fecha correspondiente en formato YYYY-MM-DD.
 
 --- Si tipo es "gasto" ---
-Categorías válidas (usa el nombre EXACTO): {", ".join(CATEGORIAS.keys())}
-Categoriza según contexto (mercado/comida/hogar -> "Gastos", Netflix/Spotify/streaming ->
-"Suscripciones", salud/EPS -> "Seguridad Social", impuestos/predial -> "Impuestos",
-diezmo/iglesia -> "Diezmo", pago de tarjeta de crédito -> "Crédito Bombotá").
+Categorías válidas (usa el nombre EXACTO): {", ".join(CATEGORIAS_GASTOS.keys())}
+Categoriza según contexto (mercado/comida en casa -> "Comida y Mercado", restaurantes/domicilios ->
+"Comer por Fuera", Uber/gasolina/parqueadero -> "Transporte", Netflix/servicios públicos/celular ->
+"Facturas y Utilidades", arriendo/administración -> "Arriendo / Admin de la casa", gimnasio/EPS/médico
+-> "Salud", cine/salidas -> "Entretenimiento", ropa/cortes de pelo -> "Belleza", muebles/aseo del hogar
+-> "Compras de Casa", curso/colegio -> "Educación", vuelos/hotel -> "Viajes y Vacaciones", plata libre
+de Cris -> "Mesada Cris", plata libre de Mari -> "Mesada Mari", relacionado al negocio -> "Trabajo",
+aportes a inversiones -> "Inversiones").
 Campos a llenar: titulo, cantidad, cuenta, categoria, fecha.
 
 --- Si tipo es "ingreso" ---
-Fuentes válidas (opcional, usa el nombre EXACTO si aplica claramente, si no null):
-{", ".join(FUENTES)}
+Fuentes válidas (usa el nombre EXACTO si aplica claramente, si no null):
+{", ".join(CATEGORIAS_INGRESOS.keys())}
 Campos a llenar: titulo, cantidad, cuenta, fuente (puede ser null), fecha.
 
 --- Si tipo es "transferencia" ---
@@ -153,7 +179,7 @@ def notion_create_page(data_source_id: str, properties: dict) -> str:
             "Notion-Version": "2025-09-03",
             "Content-Type": "application/json",
         },
-        json={"parent": {"data_source_id": data_source_id}, "properties": properties},
+        json={"parent": {"type": "data_source_id", "data_source_id": data_source_id}, "properties": properties},
         timeout=30,
     )
     response.raise_for_status()
@@ -162,34 +188,34 @@ def notion_create_page(data_source_id: str, properties: dict) -> str:
 
 def create_gasto(parsed: dict) -> str:
     properties = {
-        "Gasto": {"title": [{"text": {"content": parsed["titulo"]}}]},
-        "Cantidad": {"number": parsed["cantidad"]},
-        "Fecha": {"date": {"start": parsed["fecha"]}},
-        "Cuenta": {"relation": [{"id": CUENTAS[parsed["cuenta"]]}]},
-        "Categoría": {"relation": [{"id": CATEGORIAS[parsed["categoria"]]}]},
+        "Name": {"title": [{"text": {"content": parsed["titulo"]}}]},
+        "Amount": {"number": parsed["cantidad"]},
+        "Date": {"date": {"start": parsed["fecha"]}},
+        "Account": {"relation": [{"id": CUENTAS[parsed["cuenta"]]}]},
+        "Category": {"relation": [{"id": CATEGORIAS_GASTOS[parsed["categoria"]]}]},
     }
     return notion_create_page(GASTOS_DATA_SOURCE_ID, properties)
 
 
 def create_ingreso(parsed: dict) -> str:
     properties = {
-        "Ingreso": {"title": [{"text": {"content": parsed["titulo"]}}]},
+        "Name": {"title": [{"text": {"content": parsed["titulo"]}}]},
         "Cantidad": {"number": parsed["cantidad"]},
         "Fecha": {"date": {"start": parsed["fecha"]}},
-        "Cuentas": {"relation": [{"id": CUENTAS[parsed["cuenta"]]}]},
+        "Cuenta": {"relation": [{"id": CUENTAS[parsed["cuenta"]]}]},
     }
     if parsed.get("fuente"):
-        properties["Fuente"] = {"select": {"name": parsed["fuente"]}}
+        properties["Categoría"] = {"relation": [{"id": CATEGORIAS_INGRESOS[parsed["fuente"]]}]}
     return notion_create_page(INGRESOS_DATA_SOURCE_ID, properties)
 
 
 def create_transferencia(parsed: dict) -> str:
     properties = {
-        "Transacciones": {"title": [{"text": {"content": parsed["titulo"]}}]},
+        "Name": {"title": [{"text": {"content": parsed["titulo"]}}]},
         "Cantidad": {"number": parsed["cantidad"]},
         "Fecha": {"date": {"start": parsed["fecha"]}},
-        "De qué Cuenta": {"relation": [{"id": CUENTAS[parsed["cuenta_origen"]]}]},
-        "Hacia cuál Cuenta": {"relation": [{"id": CUENTAS[parsed["cuenta_destino"]]}]},
+        "Desde": {"relation": [{"id": CUENTAS[parsed["cuenta_origen"]]}]},
+        "Hacia": {"relation": [{"id": CUENTAS[parsed["cuenta_destino"]]}]},
     }
     return notion_create_page(TRANSFERENCIAS_DATA_SOURCE_ID, properties)
 
@@ -200,9 +226,9 @@ def create_transferencia(parsed: dict) -> str:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "¡Hola! Solo escríbeme tus movimientos en lenguaje natural, por ejemplo:\n\n"
-        '"Gasté 45.000 en mercado, tarjeta de Cris"\n'
-        '"Me pagaron 800.000 de branding, a mi Bancolombia"\n'
-        '"Pasé 100.000 de mi Bancolombia a mi Nu"\n\n'
+        '"Gasté 45.000 en mercado, Nequi de Cris"\n'
+        '"Me pagaron 800.000 de branding, a mi Nu"\n'
+        '"Pasé 100.000 de mi Nequi a mi Nu"\n\n'
         "Yo detecto si es gasto, ingreso o transferencia, y lo registro directo en Notion. 🙂"
     )
 
