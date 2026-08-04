@@ -150,7 +150,7 @@ def notion_create_page(data_source_id: str, properties: dict) -> str:
         "https://api.notion.com/v1/pages",
         headers={
             "Authorization": f"Bearer {NOTION_API_KEY}",
-            "Notion-Version": "2022-06-28",
+            "Notion-Version": "2025-09-03",
             "Content-Type": "application/json",
         },
         json={"parent": {"data_source_id": data_source_id}, "properties": properties},
