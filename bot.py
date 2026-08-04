@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # CONFIGURACIÓN (se toma de variables de entorno, ver .env.example)
 # ----------------------------------------------------------------------------
 TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
-GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]  # gratis en aistudio.google.com/apikey
+GROQ_API_KEY = os.environ["GROQ_API_KEY"]  # gratis en console.groq.com/keys
 NOTION_API_KEY = os.environ["NOTION_API_KEY"]
 
 GASTOS_DATA_SOURCE_ID = os.environ["GASTOS_DATA_SOURCE_ID"]
@@ -64,9 +64,9 @@ pending_entries: dict[int, str] = {}
 
 
 # ----------------------------------------------------------------------------
-# PASO 1: interpretar el mensaje con Gemini (gratis)
+# PASO 1: interpretar el mensaje con Groq (gratis, modelo Llama)
 # ----------------------------------------------------------------------------
-def parse_message_with_gemini(message_text: str, sender_name: str, today: str) -> dict:
+def parse_message_with_groq(message_text: str, sender_name: str, today: str) -> dict:
     system_prompt = f"""Eres un asistente que convierte mensajes en español sobre finanzas domésticas
 en datos estructurados para tres bases de datos de Notion: Gastos, Ingresos y Transferencias.
 
@@ -121,19 +121,24 @@ corta y específica en "clarification_question", dejando el resto de campos en n
 """
 
     response = requests.post(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-        params={"key": GOOGLE_API_KEY},
-        headers={"content-type": "application/json"},
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        },
         json={
-            "system_instruction": {"parts": [{"text": system_prompt}]},
-            "contents": [{"parts": [{"text": message_text}]}],
-            "generationConfig": {"responseMimeType": "application/json"},
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message_text},
+            ],
+            "response_format": {"type": "json_object"},
         },
         timeout=30,
     )
     response.raise_for_status()
     data = response.json()
-    text = data["candidates"][0]["content"]["parts"][0]["text"]
+    text = data["choices"][0]["message"]["content"]
     return json.loads(text)
 
 
@@ -221,7 +226,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.chat.send_action("typing")
 
     try:
-        parsed = parse_message_with_gemini(message_text, sender_name, today)
+        parsed = parse_message_with_groq(message_text, sender_name, today)
     except Exception:
         logger.exception("Error interpretando el mensaje")
         await update.message.reply_text("No pude interpretar ese mensaje, ¿puedes intentar de nuevo?")
