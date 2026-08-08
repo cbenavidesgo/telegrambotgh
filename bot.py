@@ -182,6 +182,8 @@ def notion_create_page(data_source_id: str, properties: dict) -> str:
         json={"parent": {"type": "data_source_id", "data_source_id": data_source_id}, "properties": properties},
         timeout=30,
     )
+    if not response.ok:
+        logger.error("Notion respondió %s: %s", response.status_code, response.text)
     response.raise_for_status()
     return response.json()["url"]
 
