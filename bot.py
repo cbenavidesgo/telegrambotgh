@@ -87,6 +87,10 @@ pending_entries: dict[int, str] = {}
 # PASO 1: interpretar el mensaje con Groq (gratis, modelo Llama)
 # ----------------------------------------------------------------------------
 def parse_message_with_groq(message_text: str, sender_name: str, today: str) -> dict:
+    dias_semana = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    hoy_dt = datetime.strptime(today, "%Y-%m-%d")
+    hoy_nombre_dia = dias_semana[hoy_dt.weekday()]
+
     system_prompt = f"""Eres un asistente que convierte mensajes en español sobre finanzas domésticas
 en datos estructurados para tres bases de datos de Notion: Gastos, Ingresos y Transferencias.
 
@@ -103,8 +107,17 @@ de pago (ej. "pagué con Rappi" sin decir la tarjeta), asume la cuenta de tipo R
 ("RappiCard {sender_name}" o "RappiCuenta {sender_name}", prioriza "RappiCard" si no hay más contexto).
 Si no hay ninguna pista de cuenta, usa "Cash" solo si el mensaje sugiere efectivo, si no pide aclaración.
 
-La fecha de hoy es {today}. Si el mensaje no menciona fecha, usa hoy. Si dice "ayer", "anteayer"
-o un día específico, calcula la fecha correspondiente en formato YYYY-MM-DD.
+La fecha de hoy es {today} ({hoy_nombre_dia}). Si el mensaje no menciona fecha, usa hoy.
+Resuelve expresiones relativas de fecha con cuidado:
+- "ayer" / "anteayer" -> resta 1 o 2 días a hoy.
+- "hace N días" -> resta N días a hoy.
+- "el lunes pasado", "el sábado", etc. (sin decir "próximo") -> el día de esa semana ANTERIOR
+  más cercano hacia atrás desde hoy (nunca una fecha futura). Ej: si hoy es {hoy_nombre_dia}
+  {today} y dicen "el lunes pasado", cuenta hacia atrás día por día desde hoy hasta el lunes
+  más reciente.
+- Una fecha explícita ("3 de agosto", "03/08") -> conviértela a YYYY-MM-DD, asumiendo el año
+  actual salvo que digan otro.
+Siempre da el resultado final en formato YYYY-MM-DD.
 
 --- Si tipo es "gasto" ---
 Categorías válidas (usa el nombre EXACTO): {", ".join(CATEGORIAS_GASTOS.keys())}
