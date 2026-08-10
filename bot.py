@@ -313,8 +313,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
 
+async def notify_startup(app: Application) -> None:
+    for user_id in ALLOWED_USER_IDS:
+        try:
+            await app.bot.send_message(chat_id=user_id, text="🟢 Bot reiniciado y en línea.")
+        except Exception:
+            logger.exception("No pude notificar el arranque a %s", user_id)
+
+
 def main() -> None:
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).post_init(notify_startup).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     logger.info("Bot iniciado, escuchando mensajes...")
