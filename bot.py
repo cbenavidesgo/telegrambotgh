@@ -168,7 +168,8 @@ corta y específica en "clarification_question", dejando el resto de campos en n
             "Content-Type": "application/json",
         },
         json={
-            "model": "openai/gpt-oss-120b",
+            "model": "qwen/qwen3.6-27b",
+            "reasoning_effort": "none",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": message_text},
@@ -180,6 +181,13 @@ corta y específica en "clarification_question", dejando el resto de campos en n
     response.raise_for_status()
     data = response.json()
     text = data["choices"][0]["message"]["content"]
+    # Red de seguridad: si el modelo mete texto extra alrededor del JSON (algunos modelos de
+    # "razonamiento" a veces lo hacen a pesar del modo JSON), nos quedamos solo con lo que hay
+    # entre la primera "{" y la última "}".
+    inicio = text.find("{")
+    fin = text.rfind("}")
+    if inicio != -1 and fin != -1:
+        text = text[inicio : fin + 1]
     parsed = json.loads(text)
 
     # Red de seguridad: si el mensaje menciona "rappi" sin aclarar tarjeta/crédito, forzamos
