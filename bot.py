@@ -178,6 +178,8 @@ corta y específica en "clarification_question", dejando el resto de campos en n
         },
         timeout=30,
     )
+    if not response.ok:
+        logger.error("Groq respondió %s: %s", response.status_code, response.text)
     response.raise_for_status()
     data = response.json()
     text = data["choices"][0]["message"]["content"]
