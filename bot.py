@@ -102,9 +102,11 @@ Primero decide el "tipo" de movimiento:
 Cuentas válidas (usa el nombre EXACTO): {", ".join(CUENTAS.keys())}
 
 Quien escribe el mensaje se llama: {sender_name}. Los nombres de cuenta ya incluyen "Cris" o "Mari"
-según de quién son (ej. "Nequi Cris", "Nu Mari"). Si el mensaje no aclara la cuenta pero sí el método
-de pago (ej. "pagué con Rappi" sin decir la tarjeta), asume la cuenta de tipo Rappi de {sender_name}
-("RappiCard {sender_name}" o "RappiCuenta {sender_name}", prioriza "RappiCard" si no hay más contexto).
+según de quién son (ej. "Nequi Cris", "Nu Mari"). Si el mensaje solo dice "Rappi" sin aclarar más
+(sin decir "tarjeta" o "crédito"), asume la cuenta "RappiCuenta {sender_name}" (el saldo/billetera
+de Rappi). Solo usa "RappiCard {sender_name}" si el mensaje menciona explícitamente "tarjeta",
+"crédito" o "RappiCard". Cris tiene ambas cuentas de Rappi (RappiCuenta y RappiCard); Mari solo
+tiene RappiCard, así que si Mari menciona "Rappi", usa "RappiCard Mari".
 Si no hay ninguna pista de cuenta, usa "Cash" solo si el mensaje sugiere efectivo, si no pide aclaración.
 
 La fecha de hoy es {today} ({hoy_nombre_dia}). Si el mensaje no menciona fecha, usa hoy.
@@ -166,7 +168,7 @@ corta y específica en "clarification_question", dejando el resto de campos en n
             "Content-Type": "application/json",
         },
         json={
-            "model": "llama-3.3-70b-versatile",
+            "model": "openai/gpt-oss-120b",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": message_text},
@@ -178,12 +180,22 @@ corta y específica en "clarification_question", dejando el resto de campos en n
     response.raise_for_status()
     data = response.json()
     text = data["choices"][0]["message"]["content"]
-    return json.loads(text)
+    parsed = json.loads(text)
 
+    # Red de seguridad: si el mensaje menciona "rappi" sin aclarar tarjeta/crédito, forzamos
+    # RappiCuenta en vez de RappiCard, sin depender de que el modelo siga la instrucción al pie
+    # de la letra (los modelos pequeños a veces no la respetan de forma consistente).
+    texto_lower = message_text.lower()
+    menciona_rappi = "rappi" in texto_lower
+    menciona_tarjeta_o_credito = any(p in texto_lower for p in ["tarjeta", "crédito", "credito"])
+    if menciona_rappi and not menciona_tarjeta_o_credito:
+        if parsed.get("cuenta") == f"RappiCard {sender_name}" and f"RappiCuenta {sender_name}" in CUENTAS:
+            parsed["cuenta"] = f"RappiCuenta {sender_name}"
+        for campo in ("cuenta_origen", "cuenta_destino"):
+            if parsed.get(campo) == f"RappiCard {sender_name}" and f"RappiCuenta {sender_name}" in CUENTAS:
+                parsed[campo] = f"RappiCuenta {sender_name}"
 
-# ----------------------------------------------------------------------------
-# PASO 2: crear la fila en la base de Notion correspondiente
-# ----------------------------------------------------------------------------
+    return parsed
 def notion_create_page(data_source_id: str, properties: dict) -> str:
     response = requests.post(
         "https://api.notion.com/v1/pages",
