@@ -82,6 +82,35 @@ CATEGORIAS_INGRESOS = {
     "Otros Trabajos": "2d56cb1b-5b1d-816e-adb5-d7c30db74d7a",
 }
 
+# Meses (2026-2027) — usados para resolver automáticamente la relación "Month"/"Mes" a partir
+# de la fecha del movimiento, sin que el usuario tenga que mencionarlo.
+MESES = {
+    "2026-01": "2d56cb1b-5b1d-8181-afd6-e489d735b8b3",
+    "2026-02": "2d56cb1b-5b1d-815a-bbf5-d70842ad43af",
+    "2026-03": "2d56cb1b-5b1d-8110-8db5-e1495d59e544",
+    "2026-04": "2d56cb1b-5b1d-81b3-aec6-c7b774b8cd08",
+    "2026-05": "2d56cb1b-5b1d-81b9-bd5d-db19b569a710",
+    "2026-06": "2d56cb1b-5b1d-8154-b4d9-fa7315508f87",
+    "2026-07": "2d56cb1b-5b1d-81f1-915a-c75cfed2e5db",
+    "2026-08": "2d56cb1b-5b1d-811a-a1fb-f7cb6f87314b",
+    "2026-09": "2d56cb1b-5b1d-81bd-a0a9-e102c9f7c278",
+    "2026-10": "2d56cb1b-5b1d-8174-b4e0-d94a311eed1a",
+    "2026-11": "2d56cb1b-5b1d-8141-9a87-df2dc1f455c4",
+    "2026-12": "2d56cb1b-5b1d-81d1-aac9-ebaf964aa4fe",
+    "2027-01": "3c06cb1b-5b1d-815d-af04-da896f59bb2a",
+    "2027-02": "3c06cb1b-5b1d-8102-83f5-fc548cc1ef84",
+    "2027-03": "3c06cb1b-5b1d-8143-bb7f-d8298c2630b8",
+    "2027-04": "3c06cb1b-5b1d-8134-bfa4-f709086977b4",
+    "2027-05": "3c06cb1b-5b1d-8161-8e0c-c9341da6bc00",
+    "2027-06": "3c06cb1b-5b1d-8179-a7db-ebfdbb4911d0",
+    "2027-07": "3c06cb1b-5b1d-8182-95ee-fc10855b7749",
+    "2027-08": "3c06cb1b-5b1d-81aa-94f1-c3270b9bb29c",
+    "2027-09": "3c06cb1b-5b1d-8127-9504-e06d9eaeaf64",
+    "2027-10": "3c06cb1b-5b1d-8157-973e-d4ff47141a66",
+    "2027-11": "3c06cb1b-5b1d-81dd-8272-f69e4f2f7488",
+    "2027-12": "3c06cb1b-5b1d-81c2-9b3b-d8ea9ee9ddcb",
+}
+
 # Estado en memoria: si el modelo necesita una aclaración, guardamos el mensaje original
 # por chat_id hasta que la persona responda.
 pending_entries: dict[int, str] = {}
@@ -222,6 +251,9 @@ def create_gasto(parsed: dict) -> str:
         "Account": {"relation": [{"id": CUENTAS[parsed["cuenta"]]}]},
         "Category": {"relation": [{"id": CATEGORIAS_GASTOS[parsed["categoria"]]}]},
     }
+    mes_id = MESES.get(parsed["fecha"][:7])
+    if mes_id:
+        properties["Month"] = {"relation": [{"id": mes_id}]}
     return notion_create_page(GASTOS_DATA_SOURCE_ID, properties)
 
 
@@ -234,6 +266,9 @@ def create_ingreso(parsed: dict) -> str:
     }
     if parsed.get("fuente"):
         properties["Categoría"] = {"relation": [{"id": CATEGORIAS_INGRESOS[parsed["fuente"]]}]}
+    mes_id = MESES.get(parsed["fecha"][:7])
+    if mes_id:
+        properties["Mes"] = {"relation": [{"id": mes_id}]}
     return notion_create_page(INGRESOS_DATA_SOURCE_ID, properties)
 
 
