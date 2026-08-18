@@ -35,15 +35,19 @@ ALLOWED_USER_IDS = {
 
 BOGOTA_TZ = timezone(timedelta(hours=-5))
 
-# Cuentas reales (usadas por los tres tipos de movimiento).
+# Cuentas reales y activas (usadas por los tres tipos de movimiento). Verificadas por
+# consulta directa a la base "Cuentas" en Notion — no incluye tarjetas archivadas/cerradas
+# (RappiCard Cris, RappiCard Mari, GZero ya no se usan).
 CUENTAS = {
     "Nequi Cris": "3366cb1b-5b1d-80db-977c-d8abfe5b8422",
+    "Nequi Mari": "3366cb1b-5b1d-804d-8bd4-d7ed78b1eb66",
     "Nu Mari": "3366cb1b-5b1d-806a-aad8-c55a93da30f5",
-    "RappiCuenta Cris": "3366cb1b-5b1d-80b5-8bb4-ecb9df3762ce",
-    "RappiCard Cris": "3366cb1b-5b1d-80bc-8977-cc7942e9a44b",
-    "Cash": "3366cb1b-5b1d-80d1-9b4c-ff40ed8b4cd5",
-    "GZero": "3366cb1b-5b1d-8017-b72d-fa41548e30cc",
-    "RappiCard Mari": "3366cb1b-5b1d-804e-8ae7-f3cbd67fd898",
+    "Rappi Cris": "3366cb1b-5b1d-80b5-8bb4-ecb9df3762ce",
+    "Efectivo": "3366cb1b-5b1d-80d1-9b4c-ff40ed8b4cd5",
+    "Cajita Nu Mari (Remodelacion)": "3b16cb1b-5b1d-8052-a670-c47319277723",
+    "Cajita Rappi Cris (Remodelacion)": "3b16cb1b-5b1d-809a-a6ee-c755bdc72d00",
+    "Ahorro - Matri Lau y Juanes": "3b16cb1b-5b1d-80b5-83f7-d853620f063f",
+    "Ahorro - Matri Emma y Santi": "3b16cb1b-5b1d-80df-870d-f960a85c6c93",
 }
 
 # Categorías válidas para gastos.
@@ -101,13 +105,14 @@ Primero decide el "tipo" de movimiento:
 
 Cuentas válidas (usa el nombre EXACTO): {", ".join(CUENTAS.keys())}
 
-Quien escribe el mensaje se llama: {sender_name}. Los nombres de cuenta ya incluyen "Cris" o "Mari"
-según de quién son (ej. "Nequi Cris", "Nu Mari"). Si el mensaje solo dice "Rappi" sin aclarar más
-(sin decir "tarjeta" o "crédito"), asume la cuenta "RappiCuenta {sender_name}" (el saldo/billetera
-de Rappi). Solo usa "RappiCard {sender_name}" si el mensaje menciona explícitamente "tarjeta",
-"crédito" o "RappiCard". Cris tiene ambas cuentas de Rappi (RappiCuenta y RappiCard); Mari solo
-tiene RappiCard, así que si Mari menciona "Rappi", usa "RappiCard Mari".
-Si no hay ninguna pista de cuenta, usa "Cash" solo si el mensaje sugiere efectivo, si no pide aclaración.
+Quien escribe el mensaje se llama: {sender_name}. Los nombres de cuenta del día a día ya incluyen
+"Cris" o "Mari" según de quién son (ej. "Nequi Cris", "Nu Mari"). Mari no tiene cuenta de Rappi
+activa, solo Cris. "Cajita Nu Mari (Remodelacion)", "Cajita Rappi Cris (Remodelacion)",
+"Ahorro - Matri Lau y Juanes" y "Ahorro - Matri Emma y Santi" son cuentas de **ahorro** (fondos
+guardados para un fin específico) — solo úsalas si el mensaje las menciona explícitamente
+por nombre o deja clarísimo que se trata de ese ahorro puntual; nunca las asumas por defecto.
+Si no hay ninguna pista de cuenta, usa "Efectivo" solo si el mensaje sugiere pago en efectivo,
+si no pide aclaración.
 
 La fecha de hoy es {today} ({hoy_nombre_dia}). Si el mensaje no menciona fecha, usa hoy.
 Resuelve expresiones relativas de fecha con cuidado:
@@ -191,20 +196,6 @@ corta y específica en "clarification_question", dejando el resto de campos en n
     if inicio != -1 and fin != -1:
         text = text[inicio : fin + 1]
     parsed = json.loads(text)
-
-    # Red de seguridad: si el mensaje menciona "rappi" sin aclarar tarjeta/crédito, forzamos
-    # RappiCuenta en vez de RappiCard, sin depender de que el modelo siga la instrucción al pie
-    # de la letra (los modelos pequeños a veces no la respetan de forma consistente).
-    texto_lower = message_text.lower()
-    menciona_rappi = "rappi" in texto_lower
-    menciona_tarjeta_o_credito = any(p in texto_lower for p in ["tarjeta", "crédito", "credito"])
-    if menciona_rappi and not menciona_tarjeta_o_credito:
-        if parsed.get("cuenta") == f"RappiCard {sender_name}" and f"RappiCuenta {sender_name}" in CUENTAS:
-            parsed["cuenta"] = f"RappiCuenta {sender_name}"
-        for campo in ("cuenta_origen", "cuenta_destino"):
-            if parsed.get(campo) == f"RappiCard {sender_name}" and f"RappiCuenta {sender_name}" in CUENTAS:
-                parsed[campo] = f"RappiCuenta {sender_name}"
-
     return parsed
 def notion_create_page(data_source_id: str, properties: dict) -> str:
     response = requests.post(
