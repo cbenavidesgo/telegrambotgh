@@ -1,73 +1,177 @@
-# Bot de Gastos - Cris & Mari
+# 🏠 Bot de Gastos — Cris & Mari
 
-Bot de Telegram que registra gastos, ingresos y transferencias en sus bases de
-Notion a partir de mensajes en lenguaje natural.
+Bot de Telegram que registra **gastos, ingresos y transferencias** directo en Notion,
+a partir de mensajes escritos en lenguaje natural. Sin formularios, sin abrir Notion:
+solo le escriben al bot como si le escribieran a una persona.
 
-**Ya tienes listos:**
-- ✅ Token del bot de Telegram
-- ✅ API key de Notion, ya conectada a las 3 bases
-- ⬜ API key gratis de Google Gemini (falta crearla, sin tarjeta)
-- ⬜ IDs de Telegram de Cris y Mari (falta conseguirlos)
+> "Gasté 45.000 en mercado, Nequi de Cris" → queda registrado en Notion en segundos.
 
-## 1. Conectar tu integración de Notion a las 3 bases (2 min) — PENDIENTE
+---
 
-Tu API key de Notion ya la tengo puesta en `.env`, pero una integración solo puede
-leer/escribir en las páginas donde la conectes explícitamente. Tienes que hacer esto
-**una vez por cada una** de las 3 bases:
+## 📐 Cómo funciona
 
-1. Abre en Notion la base **"Gastos"** → botón "···" (arriba a la derecha) →
-   "Conexiones" (Connections) → busca tu integración y conéctala.
-2. Repite lo mismo en la base **"Ingresos"**.
-3. Repite lo mismo en la base **"Transferencias"**.
+```
+Cris o Mari (Telegram)
+        │
+        ▼
+   bot.py (Railway, corriendo 24/7)
+        │
+        ├──► Groq API (gratis) — interpreta el mensaje y lo convierte en JSON:
+        │     tipo, título, monto, cuenta, categoría, fecha
+        │
+        └──► Notion API — crea la fila en la base correcta
+              (Gastos / Ingresos / Transferencias)
+```
 
-Si te da pereza buscarlas, dime y te paso el link directo a cada una.
+El bot detecta automáticamente si el mensaje es un **gasto**, un **ingreso** o una
+**transferencia** entre cuentas propias, y resuelve fechas relativas ("ayer", "el
+lunes pasado", "hace 3 días") sin que el usuario tenga que escribir la fecha exacta.
 
-## 2. Obtener tu API key GRATIS de Google (Gemini) — PENDIENTE
+---
 
-1. Ve a https://aistudio.google.com/apikey (entra con cualquier cuenta de Gmail).
-2. Dale clic a **"Create API key"**. No pide tarjeta de crédito.
-3. Copia la clave y pégala en `.env` donde dice `GOOGLE_API_KEY=`.
+## 🗂️ Estructura de Notion
 
-El plan gratis permite hasta 1.500 mensajes al día — muchísimo más de lo que ustedes van a necesitar.
+El bot trabaja sobre 5 bases de datos del workspace **"Hogar - Cris & Mari"**:
 
-## 3. Obtener los IDs de Telegram de Cris y Mari — PENDIENTE
+| Base | Para qué |
+|---|---|
+| **Gastos** | Cada gasto registrado |
+| **Ingresos** | Cada ingreso registrado |
+| **Transferencias** | Movimientos entre cuentas propias |
+| **Cuentas** | Catálogo de cuentas (Nequi Cris, Nu Mari, RappiCuenta Cris, RappiCard Cris, RappiCard Mari, Cash, GZero) |
+| **Categorías de Gastos / Categorías de Ingreso** | Catálogo de categorías |
 
-Cada uno le escribe a **@userinfobot** en Telegram y les da su ID numérico (algo como `987654321`).
-Ponlos en `.env` en `ALLOWED_TELEGRAM_USER_IDS=123123123,987654321` (sin espacios, separados por coma).
-Si lo dejas vacío, cualquier persona que encuentre el bot podrá usarlo — no recomendado.
+⚠️ **Importante:** la integración de Notion necesita acceso a las **5 bases**, no solo
+a Gastos/Ingresos/Transferencias. Como estas últimas guardan relaciones (`Account`,
+`Category`, `Cuenta`, `Desde`, `Hacia`) que apuntan a páginas de Cuentas y Categorías,
+Notion rechaza la escritura con un error `404` si esas bases auxiliares no están
+también conectadas a la integración.
 
-## 4. Desplegar en Railway (gratis, recomendado)
+---
 
-1. Crea una cuenta en https://railway.app (puedes entrar con GitHub).
-2. Sube esta carpeta a un repositorio de GitHub (o usa "Deploy from local directory" si Railway te lo permite).
-3. En Railway: "New Project" → "Deploy from GitHub repo" → selecciona el repo.
-4. En la pestaña **Variables**, agrega el contenido completo de tu archivo `.env`
-   (Railway te deja pegar un bloque tipo `.env` completo de una vez, busca el botón
-   "Raw Editor" o "Import from .env").
-5. Railway detectará que es un proyecto Python e instalará `requirements.txt` solo.
-6. En "Settings" → "Deploy", asegúrate que el **Start Command** sea `python bot.py`.
-7. Dale deploy. En los logs deberías ver "Bot iniciado, escuchando mensajes...".
+## ⚙️ Configuración inicial
 
-Alternativa: **Render.com** funciona igual de bien, como "Background Worker" (no "Web Service",
-porque este bot no expone un puerto HTTP).
+### 1. Bot de Telegram
+1. Habla con **@BotFather** en Telegram.
+2. `/newbot` → nombre → username.
+3. Guarda el **token** que te da (`TELEGRAM_BOT_TOKEN`).
 
-## 6. Probarlo
+### 2. Integración de Notion
+1. Crea una integración en https://www.notion.so/profile/integrations.
+2. Copia su **token de acceso** (`NOTION_API_KEY`).
+3. Conéctala a las **5 bases** mencionadas arriba: abre cada una → "···" → Conexiones
+   → busca el nombre de tu integración → agrégala.
+   - Truco: si tienes bases duplicadas con el mismo nombre, conéctalas **desde dentro
+     de cada página específica** (no desde el buscador genérico de la integración),
+     así no hay riesgo de conectar la base equivocada.
 
-Abre Telegram, busca tu bot por el username que le pusiste, dale "Start", y prueba los tres tipos:
+### 3. API key de Groq (gratis, sin tarjeta)
+1. Ve a https://console.groq.com/keys → "Create API Key".
+2. Copia la clave (`GROQ_API_KEY`, empieza con `gsk_...`).
 
-> Gasté 45.000 en mercado, tarjeta de Cris
-> Me pagaron 800.000 de branding, a mi Bancolombia
-> Pasé 100.000 de mi Bancolombia a mi Nu
+### 4. IDs de Telegram de los usuarios autorizados
+Cada uno le escribe a **@userinfobot** en Telegram y les da su ID numérico.
 
-Debería responder confirmando el registro y crear la fila en la base de Notion correspondiente.
+---
 
-## Notas
+## 🔑 Variables de entorno
 
-- El bot solo entiende texto (no fotos de recibos, por ahora).
-- Detecta automáticamente si el mensaje es un gasto, un ingreso o una transferencia entre cuentas.
-- Si mencionas una cuenta, categoría o fuente ambigua, el bot te va a preguntar antes de guardar.
-- Si agregan una cuenta, categoría o fuente nueva en Notion más adelante, hay que agregarla también
-  en los diccionarios `CUENTAS`, `CATEGORIAS` o `FUENTES` dentro de `bot.py` (el ID de página se ve
-  en la URL de la página en Notion).
-- El bot corre por *polling* (pregunta a Telegram cada pocos segundos), así que no necesita
-  un dominio ni HTTPS — funciona en el plan gratuito de Railway/Render sin configuración extra.
+| Variable | Descripción |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | Token del bot (@BotFather) |
+| `GROQ_API_KEY` | API key gratis de Groq |
+| `NOTION_API_KEY` | Token de la integración de Notion |
+| `GASTOS_DATA_SOURCE_ID` | ID del data source "Gastos" |
+| `INGRESOS_DATA_SOURCE_ID` | ID del data source "Ingresos" |
+| `TRANSFERENCIAS_DATA_SOURCE_ID` | ID del data source "Transferencias" |
+| `ALLOWED_TELEGRAM_USER_IDS` | IDs de Telegram autorizados, separados por coma |
+
+Ver `.env.example` para el formato exacto. **Nunca subas tu `.env` real a GitHub** —
+solo va como variables de entorno en Railway.
+
+---
+
+## 🚀 Desplegar en Railway (gratis)
+
+1. Crea cuenta en https://railway.app (con GitHub, así quedan conectadas).
+2. **New Project** → **Deploy from GitHub repo** → selecciona este repositorio.
+3. Pestaña **Variables** → **Raw Editor** → pega el contenido completo de tu `.env`.
+4. En **Settings → Source**, confirma que:
+   - El repo y la rama (`main`) son correctos.
+   - **"Auto Deploy"** está activado (⚠️ ver sección de problemas comunes abajo).
+5. Verifica en **Settings** que el comando de arranque sea `python bot.py`.
+
+El bot corre por **polling** (no webhook), así que no necesita dominio ni puerto
+HTTP expuesto — funciona tal cual en el plan gratuito.
+
+---
+
+## 💬 Ejemplos de uso
+
+```
+Gasté 45.000 en mercado, Nequi de Cris
+Pagué el recibo de la luz, 8.390 desde RappiCuenta Cris
+Me pagaron 800.000 de freelance, a mi Nu de Mari
+Pasé 100.000 de mi Nequi a mi Nu
+Gasté 20.000 en transporte el lunes pasado, RappiCard Cris
+```
+
+Si el bot no tiene información suficiente (por ejemplo no sabe de qué cuenta hablas),
+te va a preguntar antes de guardar nada.
+
+---
+
+## 🛠️ Problemas comunes (y cómo se resolvieron)
+
+Estos son errores reales que salieron durante la construcción de este bot — quedan
+documentados para el futuro:
+
+### `404` al crear la página en Notion
+**Causa más común:** la integración no tiene acceso a la base específica (revisa que
+sea la base correcta si hay duplicados con el mismo nombre), **o** le falta acceso a
+la base de **Cuentas** / **Categorías** (las bases "auxiliares" de las relaciones).
+**Cómo diagnosticarlo:** el bot loggea el mensaje de error completo de Notion
+(`Notion respondió 404: ...`) — casi siempre dice exactamente qué página no encuentra.
+
+### `404` al llamar a Groq
+Los proveedores de IA gratis van retirando modelos con el tiempo. Si ves un 404
+apuntando a `api.groq.com`, entra a https://console.groq.com/docs/models y revisa
+cuál es el modelo vigente — hay que actualizar el nombre del modelo en `bot.py`
+(variable dentro de `parse_message_with_groq`).
+
+### El bot sigue fallando aunque ya subiste el código nuevo a GitHub
+Revisa en Railway → **Deployments** si aparece un aviso de **"Update available"** —
+a veces el auto-deploy no se dispara solo con cada commit y hay que forzarlo
+manualmente dándole clic a ese aviso (o "Redeploy").
+
+### `Conflict: terminated by other getUpdates request`
+Significa que hay dos instancias del bot corriendo al mismo tiempo con el mismo
+token. Revisa que no haya más de un proyecto o servicio desplegado en Railway usando
+las mismas variables.
+
+### Cambiaste de proveedor de IA (Anthropic → Gemini → Groq)
+El proyecto empezó con la API de Anthropic (de pago), se probó con Gemini (los
+API keys nuevos de Google con prefijo `AQ.` tuvieron un bug conocido de compatibilidad
+en 2026), y terminó en **Groq**, que ofrece un plan gratis con claves estables
+(`gsk_...`) sin ese problema.
+
+---
+
+## 🔔 Notificación de estado
+
+El bot manda un mensaje "🟢 Bot reiniciado y en línea" a los usuarios autorizados
+cada vez que arranca — útil para notar si Railway lo reinició por una caída.
+Complementario: activa las notificaciones de "Deployment failed" en la configuración
+de tu cuenta de Railway para recibir un correo si el servicio se cae.
+
+---
+
+## 🔐 Seguridad
+
+- Las credenciales (`NOTION_API_KEY`, `GROQ_API_KEY`, `TELEGRAM_BOT_TOKEN`) viven
+  **solo** en las variables de entorno de Railway — nunca en el repositorio.
+- Solo los IDs de Telegram listados en `ALLOWED_TELEGRAM_USER_IDS` pueden usar el bot.
+- Si alguna credencial se expone por accidente, rótala de inmediato:
+  - Notion: integración → "Actualizar el token de acceso".
+  - Telegram: @BotFather → `/revoke`.
+  - Groq: console.groq.com/keys → eliminar y crear una nueva.
