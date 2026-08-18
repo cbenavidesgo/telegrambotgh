@@ -38,7 +38,7 @@ El bot trabaja sobre 5 bases de datos del workspace **"Hogar - Cris & Mari"**:
 | **Gastos** | Cada gasto registrado |
 | **Ingresos** | Cada ingreso registrado |
 | **Transferencias** | Movimientos entre cuentas propias |
-| **Cuentas** | Catálogo de cuentas (Nequi Cris, Nu Mari, RappiCuenta Cris, RappiCard Cris, RappiCard Mari, Cash, GZero) |
+| **Cuentas** | Catálogo de cuentas (Nequi Cris, Nequi Mari, Nu Mari, Rappi Cris, Efectivo, Cajita Nu Mari (Remodelación), Cajita Rappi Cris (Remodelación), Ahorro - Matri Lau y Juanes, Ahorro - Matri Emma y Santi) |
 | **Categorías de Gastos / Categorías de Ingreso** | Catálogo de categorías |
 
 ⚠️ **Importante:** la integración de Notion necesita acceso a las **5 bases**, no solo
